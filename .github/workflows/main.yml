@@ -1,8 +1,12 @@
 name: VAVOO GUNCELLE
 on:
   schedule:
-    - cron: '0 6 * * *' # Her sabah 06:00'da çalışır
+    - cron: '0 6 * * *'
   workflow_dispatch:
+
+# BU KISMI EKLE:
+permissions:
+  contents: write
 
 jobs:
   vavoo-cek:
