@@ -64,7 +64,8 @@ def vavoo_kanallari_cek():
         except:
             break
 
-    # 4. M3U Olarak Kaydet
+# 4. M3U Olarak Kaydet
+    print(f"Toplam çekilen ham veri: {len(all_channels)}") # BU SATIRI EKLEDİK
     if all_channels:
         with open("vavoo.m3u", "w", encoding="utf-8") as f:
             f.write("#EXTM3U\n")
