@@ -4,7 +4,6 @@ on:
     - cron: '0 6 * * *'
   workflow_dispatch:
 
-# BU KISMI EKLE:
 permissions:
   contents: write
 
@@ -14,6 +13,8 @@ jobs:
     steps:
       - name: Depoyu Çek
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Tüm geçmişi çek ki çakışma olmasın
       
       - name: Python Kur
         uses: actions/setup-python@v4
@@ -30,6 +31,7 @@ jobs:
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          git add vavoo.m3u
+          git pull --rebase origin main # Çakışmaları otomatik çöz
+          git add vavoo.m3u || echo "Dosya bulunamadı"
           git commit -m "Vavoo Listesi Guncellendi" || echo "Degisiklik yok"
-          git push
+          git push origin main
