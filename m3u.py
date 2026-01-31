@@ -2,17 +2,13 @@ import requests
 import re
 import os
 
-# Vavoo için FlareSolverr gerekmez, bu yüzden URL tanımlamaya gerek yok.
-
 def vavoo_kanallari_cek():
     print("Vavoo kanalları çekiliyor...")
     
-    # 1. Vavoo Sunucusuna Giriş İçin İmza (Signature) Al
     def get_imza():
         headers = {
             "user-agent": "okhttp/4.11.0",
-            "accept": "application/json",
-            "content-type": "application/json; charset=utf-8"
+            "accept": "application/json"
         }
         data = {
             "token": "tosFwQCJMS8qrW_AjLoHPQ41646J5dRNha6ZWHnijoYQQQoADQoXYSo7ki7O5-CsgN4CH0uRk6EEoJ0728ar9scCRQW3ZkbfrPfeCXW2VgopSW2FWDqPOoVYIuVPAOnXCZ5g",
@@ -21,19 +17,22 @@ def vavoo_kanallari_cek():
             "metadata": {"device": {"type": "Handset", "os": "Android", "model": "Pixel 4", "brand": "Google"}}
         }
         try:
-            resp = requests.post("https://vavoo.to/mediahubmx-signature.json", json=data, headers=headers, timeout=10)
-            return resp.json().get("signature")
-        except:
-            print("❌ İmza alınamadı!")
+            resp = requests.post("https://vavoo.to/mediahubmx-signature.json", json=data, headers=headers, timeout=15)
+            sig = resp.json().get("signature")
+            if sig:
+                print(f"✅ İmza başarıyla alındı.")
+                return sig
+            else:
+                print(f"❌ İmza boş döndü! Yanıt: {resp.text}")
+                return None
+        except Exception as e:
+            print(f"❌ İmza isteği hatası: {e}")
             return None
 
-    # 2. Kanal İsimlerini Temizle
-    def isim_temizle(name):
-        return re.sub(r'\s*\.[a-z]\s*$', '', name, flags=re.IGNORECASE).strip()
-
-    # 3. Kanalları Çek
     imza = get_imza()
-    if not imza: return
+    if not imza: 
+        print("İmza olmadan devam edilemiyor.")
+        return
 
     headers = {
         "user-agent": "okhttp/4.11.0",
@@ -43,6 +42,8 @@ def vavoo_kanallari_cek():
 
     all_channels = []
     cursor = 0
+    print("Kanal listesi isteniyor...")
+    
     while True:
         payload = {
             "language": "de",
@@ -55,30 +56,34 @@ def vavoo_kanallari_cek():
             "cursor": cursor
         }
         try:
-            resp = requests.post("https://vavoo.to/mediahubmx-catalog.json", json=payload, headers=headers, timeout=10)
+            resp = requests.post("https://vavoo.to/mediahubmx-catalog.json", json=payload, headers=headers, timeout=15)
             data = resp.json()
             items = data.get("items", [])
             all_channels.extend(items)
+            print(f"Şu ana kadar çekilen kanal sayısı: {len(all_channels)}")
+            
             cursor = data.get("nextCursor")
             if not cursor: break
-        except:
+        except Exception as e:
+            print(f"❌ Kanal çekme hatası: {e}")
             break
 
-# 4. M3U Olarak Kaydet
-    print(f"Toplam çekilen ham veri: {len(all_channels)}") # BU SATIRI EKLEDİK
+    # Dosya Oluşturma Kısmı
     if all_channels:
-        with open("vavoo.m3u", "w", encoding="utf-8") as f:
-            f.write("#EXTM3U\n")
-            for ch in all_channels:
-                name = isim_temizle(ch.get("name", "Isimsiz"))
-                url = ch.get("url", "")
-                category = ch.get("group", "Genel")
-                if url:
-                    f.write(f'#EXTINF:-1 group-title="{category} VAVOO",{name}\n{url}\n')
-        
-        print(f"✅ Bitti! {len(all_channels)} kanal 'vavoo.m3u' dosyasına kaydedildi.")
+        try:
+            with open("vavoo.m3u", "w", encoding="utf-8") as f:
+                f.write("#EXTM3U\n")
+                for ch in all_channels:
+                    name = ch.get("name", "Isimsiz")
+                    url = ch.get("url", "")
+                    category = ch.get("group", "Genel")
+                    if url:
+                        f.write(f'#EXTINF:-1 group-title="{category} VAVOO",{name}\n{url}\n')
+            print(f"✅ BAŞARILI: 'vavoo.m3u' dosyası {len(all_channels)} kanal ile yazıldı.")
+        except Exception as e:
+            print(f"❌ Dosya yazma hatası: {e}")
     else:
-        print("❌ Hiç kanal bulunamadı.")
+        print("⚠️ KRİTİK: Liste boş olduğu için dosya oluşturulmadı. Vavoo IP engeli uyguluyor olabilir.")
 
 if __name__ == "__main__":
     vavoo_kanallari_cek()
