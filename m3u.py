@@ -411,33 +411,60 @@ def vavoo_channels():
     print("Eseguendo vavoo_channels...")
     
     def getAuthSignature():
-        headers = {
-            "user-agent": "okhttp/4.11.0",
-            "accept": "application/json",
-            "content-type": "application/json; charset=utf-8",
-            "content-length": "1106",
-            "accept-encoding": "gzip"
-        }
-        data = {
-            "token": "tosFwQCJMS8qrW_AjLoHPQ41646J5dRNha6ZWHnijoYQQQoADQoXYSo7ki7O5-CsgN4CH0uRk6EEoJ0728ar9scCRQW3ZkbfrPfeCXW2VgopSW2FWDqPOoVYIuVPAOnXCZ5g",
-            "reason": "app-blur",
-            "locale": "de",
-            "theme": "dark",
-            "metadata": {
-                "device": {
-                    "type": "Handset",
-                    "os": "Android",
-                    "osVersion": "10",
-                    "model": "Pixel 4",
-                    "brand": "Google"
-                }
+        try:
+            # Logic adapted from vxparser/utils/vavoo.py getWatchedSig()
+            _headers = {
+                "user-agent": "okhttp/4.11.0", 
+                "accept": "application/json", 
+                "content-type": "application/json; charset=utf-8", 
+                "content-length": "1106", 
+                "accept-encoding": "gzip"
             }
-        }
-        resp = requests.post("https://vavoo.to/mediahubmx-signature.json", json=data, headers=headers, timeout=10)
-        return resp.json().get("signature")
+            _data = {
+                "token": "",
+                "reason": "boot",
+                "locale": "de",
+                "theme": "dark",
+                "metadata": {
+                    "device": {"type": "desktop", "uniqueId": ""},
+                    "os": {"name": "win32", "version": "Windows 10 Education", "abis": ["x64"], "host": "DESKTOP-JN65HTI"},
+                    "app": {"platform": "electron"},
+                    "version": {"package": "app.lokke.main", "binary": "1.0.19", "js": "1.0.19"}
+                },
+                "appFocusTime": 173,
+                "playerActive": False,
+                "playDuration": 0,
+                "devMode": True,
+                "hasAddon": True,
+                "castConnected": False,
+                "package": "app.lokke.main",
+                "version": "1.0.19",
+                "process": "app",
+                "firstAppStart": 1770751158625,
+                "lastAppStart": 1770751158625,
+                "ipLocation": 0,
+                "adblockEnabled": True,
+                "proxy": {"supported": ["ss"], "engine": "cu", "enabled": False, "autoServer": True, "id": 0},
+                "iap": {"supported": False}
+            }
+            
+            print("Richiesta firma a lokke.app...")
+            req = requests.post('https://www.lokke.app/api/app/ping', json=_data, headers=_headers, timeout=10)
+            req.raise_for_status()
+            resp_json = req.json()
+            sig = resp_json.get("addonSig")
+            if sig:
+                print("✓ Firma ottenuta con successo")
+                return sig
+            else:
+                print("❌ Firma non trovata nella risposta")
+                return None
+        except Exception as e:
+            print(f"❌ Errore durante il recupero della firma: {e}")
+            return None
     
     def vavoo_groups():
-        # Puoi aggiungere altri gruppi per più canali
+        # I gruppi originali erano vuoti, si può estendere se necessario
         return [""]
     
     def clean_channel_name(name):
@@ -448,13 +475,18 @@ def vavoo_channels():
     
     def get_channels():
         signature = getAuthSignature()
+        if not signature:
+            print("Impossibile procedere senza firma.")
+            return []
+
         headers = {
-            "user-agent": "okhttp/4.11.0",
-            "accept": "application/json",
-            "content-type": "application/json; charset=utf-8",
-            "accept-encoding": "gzip",
+            "accept-encoding": "gzip", 
+            "user-agent": "MediaHubMX/2", 
+            "accept": "application/json", 
+            "content-type": "application/json; charset=utf-8", 
             "mediahubmx-signature": signature
         }
+
         all_channels = []
         for group in vavoo_groups():
             cursor = 0
@@ -471,16 +503,31 @@ def vavoo_channels():
                     "cursor": cursor,
                     "clientVersion": "3.0.2"
                 }
-                resp = requests.post("https://vavoo.to/mediahubmx-catalog.json", json=data, headers=headers, timeout=10)
-                r = resp.json()
-                items = r.get("items", [])
-                all_channels.extend(items)
-                cursor = r.get("nextCursor")
-                if not cursor:
+                
+                try:
+                    resp = requests.post("https://vavoo.to/mediahubmx-catalog.json", json=data, headers=headers, timeout=10)
+                    resp.raise_for_status()
+                    r = resp.json()
+                    
+                    items = r.get("items", [])
+                    if items:
+                        all_channels.extend(items)
+                        print(f"  - Caricati {len(items)} canali (Totale: {len(all_channels)})")
+                    
+                    cursor = r.get("nextCursor")
+                    if not cursor:
+                        break
+                except Exception as e:
+                    print(f"Errore durante il recupero dei canali: {e}")
                     break
+                    
         return all_channels
     
     def save_as_m3u(channels, filename="vavoo.m3u"):
+        if not channels:
+            print("Nessun canale da salvare.")
+            return
+
         # 1. Raccogli tutti i canali in una lista flat
         all_channels_flat = []
         for ch in channels:
@@ -535,9 +582,18 @@ def vavoo_channels():
             print(f"  - {category}: {len(channel_list)} canali")
     
     if __name__ == "__main__":
-        channels = get_channels()
-        print(f"Trovati {len(channels)} canali. Creo la playlist M3U con i link proxy...")
-        save_as_m3u(channels) 
+        # Questo blocco viene eseguito solo se la funzione viene chiamata direttamente 
+        # o se lo script fosse organizzato diversamente, 
+        # ma nel contesto di m3u.py, vavoo_channels() viene chiamata dal main().
+        pass
+
+    # Esecuzione diretta della logica
+    channels = get_channels()
+    if channels:
+        print(f"Trovati {len(channels)} canali. Creo la playlist M3U...")
+        save_as_m3u(channels)
+    else:
+        print("Nessun canale trovato o errore nell'autenticazione.") 
         
 def sportsonline():
     import requests
